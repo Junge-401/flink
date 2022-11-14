@@ -532,13 +532,26 @@ under the License.
 			<dependency>
 				<groupId>org.apache.commons</groupId>
 				<artifactId>commons-lang3</artifactId>
-				<version>3.3.2</version>
+				<version>3.12.0</version>
+			</dependency>
+
+			<dependency>
+				<groupId>org.apache.commons</groupId>
+				<artifactId>commons-text</artifactId>
+				<version>1.10.0</version>
 			</dependency>
 
 			<dependency>
 				<groupId>org.xerial.snappy</groupId>
 				<artifactId>snappy-java</artifactId>
 				<version>1.1.8.3</version>
+				<exclusions>
+					<exclusion>
+						<!-- Causes unnecessary dependency convergence errors; see MENFORCER-437 -->
+						<groupId>org.osgi</groupId>
+						<artifactId>org.osgi.core</artifactId>
+					</exclusion>
+				</exclusions>
 			</dependency>
 
 			<dependency>
@@ -705,6 +718,13 @@ under the License.
 				<groupId>org.apache.commons</groupId>
 				<artifactId>commons-compress</artifactId>
 				<version>1.21</version>
+				<exclusions>
+					<exclusion>
+						<!-- Causes unnecessary dependency convergence errors; see MENFORCER-437 -->
+						<groupId>org.osgi</groupId>
+						<artifactId>org.osgi.core</artifactId>
+					</exclusion>
+				</exclusions>
 			</dependency>
 
 			<!-- Managed dependency required for HBase in flink-connector-hbase -->
@@ -859,7 +879,7 @@ under the License.
 				<!-- Bumped for security purposes and making it work with Jackson dependencies (2.10.1) -->
 				<groupId>org.yaml</groupId>
 				<artifactId>snakeyaml</artifactId>
-				<version>1.27</version>
+				<version>1.31</version>
 			</dependency>
 			<dependency>
 				<groupId>io.netty</groupId>
@@ -986,6 +1006,7 @@ under the License.
 							<configuration>
 								<additionalJOptions>
 									<additionalJOption>--add-exports=java.base/sun.net.util=ALL-UNNAMED</additionalJOption>
+									<additionalJOption>--add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED</additionalJOption>
 								</additionalJOptions>
 							</configuration>
 						</plugin>
@@ -1693,12 +1714,12 @@ under the License.
 							<rules>
 								<bannedDependencies>
 									<excludes>
-										<exclude>org.yaml:snakeyaml:(,1.26]</exclude>
+										<exclude>org.yaml:snakeyaml:(,1.30]</exclude>
 									</excludes>
 									<includes>
 										<!-- Snakeyaml is pulled in by many modules without using it in production,
 											so there's no benefit in us investing time into bumping these. -->
-										<include>org.yaml:snakeyaml:(,1.26]:*:test</include>
+										<include>org.yaml:snakeyaml:(,1.30]:*:test</include>
 									</includes>
 									<message>Older snakeyaml versions are not allowed due to security vulnerabilities.</message>
 								</bannedDependencies>
@@ -2005,7 +2026,7 @@ under the License.
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-enforcer-plugin</artifactId>
-					<version>3.0.0-M1</version>
+					<version>3.1.0</version>
 				</plugin>
 
 				<plugin>
@@ -2119,6 +2140,8 @@ under the License.
 								<exclude>@org.apache.flink.annotation.PublicEvolving</exclude>
 								<exclude>@org.apache.flink.annotation.Internal</exclude>
 								<!-- MARKER: start exclusions; these will be wiped by tools/releasing/update_japicmp_configuration.sh -->
+								<!-- UnionSerializerConfigSnapshot was a PublicEvolving and Deprecated class that has been removed, embedded inside a Public CoGroupedStreams class, triggering this false failure -->
+								<exclude>org.apache.flink.streaming.api.datastream.CoGroupedStreams$UnionSerializerConfigSnapshot</exclude>
 								<!-- MARKER: end exclusions -->
 							</excludes>
 							<accessModifier>public</accessModifier>
