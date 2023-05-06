@@ -139,7 +139,7 @@ import static org.apache.flink.core.testutils.FlinkAssertions.assertThatFuture;
 import static org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils.createExecutionAttemptId;
 import static org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils.createNoOpVertex;
 import static org.apache.flink.runtime.jobgraph.JobGraphTestUtils.streamingJobGraph;
-import static org.apache.flink.runtime.jobmaster.slotpool.DefaultDeclarativeSlotPoolTest.createSlotOffersForResourceRequirements;
+import static org.apache.flink.runtime.jobmaster.slotpool.SlotPoolTestUtils.createSlotOffersForResourceRequirements;
 import static org.apache.flink.runtime.jobmaster.slotpool.SlotPoolTestUtils.offerSlots;
 import static org.apache.flink.runtime.scheduler.SchedulerTestingUtils.enableCheckpointing;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -191,6 +191,34 @@ public class AdaptiveSchedulerTest {
                 new AdaptiveSchedulerBuilder(jobGraph, mainThreadExecutor)
                         .build(EXECUTOR_RESOURCE.getExecutor())
                         .getArchivedExecutionGraph(JobStatus.INITIALIZING, null);
+
+        ArchivedExecutionGraphTest.assertContainsCheckpointSettings(archivedExecutionGraph);
+    }
+
+    @Test
+    void testArchivedJobVerticesPresent() throws Exception {
+        final JobGraph jobGraph = createJobGraph();
+        jobGraph.setSnapshotSettings(
+                new JobCheckpointingSettings(
+                        CheckpointCoordinatorConfiguration.builder().build(), null));
+
+        final ArchivedExecutionGraph archivedExecutionGraph =
+                new AdaptiveSchedulerBuilder(jobGraph, mainThreadExecutor)
+                        .build(EXECUTOR_RESOURCE.getExecutor())
+                        .getArchivedExecutionGraph(JobStatus.INITIALIZING, null);
+
+        ArchivedExecutionJobVertex jobVertex =
+                archivedExecutionGraph.getJobVertex(JOB_VERTEX.getID());
+        assertThat(jobVertex)
+                .isNotNull()
+                .satisfies(
+                        archived -> {
+                            assertThat(archived.getParallelism())
+                                    .isEqualTo(JOB_VERTEX.getParallelism());
+                            // JOB_VERTEX.maxP == -1, but we want the actual maxP determined by the
+                            // scheduler
+                            assertThat(archived.getMaxParallelism()).isEqualTo(128);
+                        });
 
         ArchivedExecutionGraphTest.assertContainsCheckpointSettings(archivedExecutionGraph);
     }

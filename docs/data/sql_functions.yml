@@ -525,7 +525,7 @@ temporal:
     description: "Converts a epoch seconds or epoch milliseconds to a TIMESTAMP_LTZ, the valid precision is 0 or 3, the 0 represents TO_TIMESTAMP_LTZ(epochSeconds, 0), the 3 represents TO_TIMESTAMP_LTZ(epochMilliseconds, 3)."
   - sql: TO_TIMESTAMP(string1[, string2])
     table: toTimestamp(STRING1[, STRING2])
-    description: "Converts date time string string1 with format string2 (by default: 'yyyy-MM-dd HH:mm:ss') under the 'UTC+0' time zone to a timestamp."
+    description: "Converts date time string string1 with format string2 (by default: 'yyyy-MM-dd HH:mm:ss') to a timestamp, without time zone."
   - sql: CURRENT_WATERMARK(rowtime)
     description: |
       Returns the current watermark for the given rowtime attribute, or `NULL` if no common watermark of all upstream operations is available at the current operation in the pipeline.
@@ -931,13 +931,18 @@ json:
 
 valueconstruction:
   - sql: |
-      -- implicit constructor with parenthesis
+      **implicit** constructor with parenthesis 
+      
       (value1 [, value2]*)
+
+      **explicit** ROW constructor with 
+      
+      ROW(value1 [, value2]*)
     table: row(ANY1, ANY2, ...)
     description: |
       Returns a row created from a list of values (value1, value2,...).
 
-      The implicit row constructor supports arbitrary expressions as fields but requires at least two fields. The explicit row constructor can deal with an arbitrary number of fields but does not support all kinds of field expressions well currently. 
+      The implicit row constructor requires at least two fields. The explicit row constructor can deal with an arbitrary number of fields. Both of them support arbitrary expressions as fields.
   - sql: ARRAY ‘[’ value1 [, value2 ]* ‘]’
     table: array(ANY1, ANY2, ...)
     description: Returns an array created from a list of values (value1, value2, ...).
