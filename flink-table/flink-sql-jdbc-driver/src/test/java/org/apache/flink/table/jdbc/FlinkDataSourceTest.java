@@ -15,32 +15,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.flink.table.planner.runtime.batch.table
 
-import org.apache.flink.table.planner.factories.TestValuesTableFactory
-import org.apache.flink.table.planner.runtime.utils.{BatchTestBase, TestData}
+package org.apache.flink.table.jdbc;
 
-import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test;
 
-class LimitITCase extends LegacyLimitITCase {
+import java.sql.Connection;
+import java.util.Properties;
 
-  @BeforeEach
-  override def before(): Unit = {
-    BatchTestBase.configForMiniCluster(tableConfig)
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-    val myTableDataId = TestValuesTableFactory.registerData(TestData.data3)
-    val ddl =
-      s"""
-         |CREATE TABLE LimitTable (
-         |  a int,
-         |  b bigint,
-         |  c string
-         |) WITH (
-         |  'connector' = 'values',
-         |  'data-id' = '$myTableDataId',
-         |  'bounded' = 'true'
-         |)
-       """.stripMargin
-    tEnv.executeSql(ddl)
-  }
+/** Tests for flink data source. */
+public class FlinkDataSourceTest extends FlinkJdbcDriverTestBase {
+
+    @Test
+    public void testDataSource() throws Exception {
+        FlinkDataSource dataSource = new FlinkDataSource(getDriverUri().getURL(), new Properties());
+        try (Connection connection = dataSource.getConnection()) {
+            assertEquals("default_catalog", connection.getCatalog());
+            assertEquals("default_database", connection.getSchema());
+        }
+    }
 }
