@@ -189,11 +189,13 @@ class ZooKeeperLeaderElectionTest {
             for (int i = 0; i < num; i++) {
                 leaderElectionService[i] =
                         ZooKeeperUtils.createLeaderElectionService(createZooKeeperClient());
-                contenders[i] = new TestingContender(createAddress(i), leaderElectionService[i]);
+                leaderElections[i] =
+                        leaderElectionService[i].createLeaderElection("random-contender-id");
+                contenders[i] = new TestingContender(createAddress(i), leaderElections[i]);
 
                 LOG.debug("Start leader election service for contender #{}.", i);
 
-                leaderElections[i] = contenders[i].startLeaderElection();
+                contenders[i].startLeaderElection();
             }
 
             String pattern = LEADER_ADDRESS + "_" + "(\\d+)";
@@ -269,6 +271,7 @@ class ZooKeeperLeaderElectionTest {
         int num = 3;
         int numTries = 30;
 
+        final String contenderID = "random-contender-id";
         DefaultLeaderElectionService[] leaderElectionService =
                 new DefaultLeaderElectionService[num];
         LeaderElection[] leaderElections = new LeaderElection[num];
@@ -286,11 +289,11 @@ class ZooKeeperLeaderElectionTest {
             for (int i = 0; i < num; i++) {
                 leaderElectionService[i] =
                         ZooKeeperUtils.createLeaderElectionService(createZooKeeperClient());
+                leaderElections[i] = leaderElectionService[i].createLeaderElection(contenderID);
                 contenders[i] =
-                        new TestingContender(
-                                LEADER_ADDRESS + "_" + i + "_0", leaderElectionService[i]);
+                        new TestingContender(LEADER_ADDRESS + "_" + i + "_0", leaderElections[i]);
 
-                leaderElections[i] = contenders[i].startLeaderElection();
+                contenders[i].startLeaderElection();
             }
 
             String pattern = LEADER_ADDRESS + "_" + "(\\d+)" + "_" + "(\\d+)";
@@ -319,12 +322,15 @@ class ZooKeeperLeaderElectionTest {
                     // create new leader election service which takes part in the leader election
                     leaderElectionService[index] =
                             ZooKeeperUtils.createLeaderElectionService(createZooKeeperClient());
+                    leaderElections[index] =
+                            leaderElectionService[index].createLeaderElection(contenderID);
+
                     contenders[index] =
                             new TestingContender(
                                     LEADER_ADDRESS + "_" + index + "_" + (lastTry + 1),
-                                    leaderElectionService[index]);
+                                    leaderElections[index]);
 
-                    leaderElections[index] = contenders[index].startLeaderElection();
+                    contenders[index].startLeaderElection();
                 } else {
                     throw new Exception("Did not find the leader's index.");
                 }
