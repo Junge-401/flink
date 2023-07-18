@@ -172,8 +172,8 @@ public class TieredResultPartition extends ResultPartition {
 
     @Override
     public void close() {
-        super.close();
         tieredStorageProducerClient.close();
+        super.close();
     }
 
     @Override
@@ -187,6 +187,11 @@ public class TieredResultPartition extends ResultPartition {
             broadcastEvent(new EndOfData(mode), false);
             hasNotifiedEndOfUserRecords = true;
         }
+    }
+
+    @Override
+    public CompletableFuture<?> getAvailableFuture() {
+        return AVAILABLE;
     }
 
     @Override

@@ -89,7 +89,7 @@ public class MemoryTierProducerAgent implements TierProducerAgent, NettyServiceP
         nettyService.registerProducer(partitionId, this);
         for (int subpartitionId = 0; subpartitionId < numSubpartitions; ++subpartitionId) {
             subpartitionProducerAgents[subpartitionId] =
-                    new MemoryTierSubpartitionProducerAgent(subpartitionId, nettyService);
+                    new MemoryTierSubpartitionProducerAgent(subpartitionId);
         }
         resourceRegistry.registerResource(partitionId, this::releaseResources);
     }
@@ -109,13 +109,17 @@ public class MemoryTierProducerAgent implements TierProducerAgent, NettyServiceP
     }
 
     @Override
-    public boolean tryWrite(TieredStorageSubpartitionId subpartitionId, Buffer finishedBuffer) {
+    public boolean tryWrite(
+            TieredStorageSubpartitionId subpartitionId, Buffer finishedBuffer, Object bufferOwner) {
         int subpartitionIndex = subpartitionId.getSubpartitionId();
         if (currentSubpartitionWriteBuffers[subpartitionIndex] != 0
                 && currentSubpartitionWriteBuffers[subpartitionIndex] + 1 > numBuffersPerSegment) {
             appendEndOfSegmentEvent(subpartitionIndex);
             currentSubpartitionWriteBuffers[subpartitionIndex] = 0;
             return false;
+        }
+        if (finishedBuffer.isBuffer()) {
+            memoryManager.transferBufferOwnership(bufferOwner, this, finishedBuffer);
         }
         currentSubpartitionWriteBuffers[subpartitionIndex]++;
         addFinishedBuffer(finishedBuffer, subpartitionIndex);
