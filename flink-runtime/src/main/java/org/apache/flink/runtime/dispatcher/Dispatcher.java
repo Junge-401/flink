@@ -38,6 +38,7 @@ import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.core.failure.FailureEnricher;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.blob.BlobServer;
+import org.apache.flink.runtime.checkpoint.CheckpointStatsSnapshot;
 import org.apache.flink.runtime.checkpoint.Checkpoints;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
 import org.apache.flink.runtime.client.DuplicateJobSubmissionException;
@@ -510,32 +511,30 @@ public abstract class Dispatcher extends FencedRpcEndpoint<DispatcherId>
 
     @Override
     public CompletableFuture<Acknowledge> submitJob(JobGraph jobGraph, Time timeout) {
-        log.info(
-                "Received JobGraph submission '{}' ({}).", jobGraph.getName(), jobGraph.getJobID());
+        final JobID jobID = jobGraph.getJobID();
+        log.info("Received JobGraph submission '{}' ({}).", jobGraph.getName(), jobID);
 
         try {
-            if (isDuplicateJob(jobGraph.getJobID())) {
-                if (isInGloballyTerminalState(jobGraph.getJobID())) {
-                    log.warn(
-                            "Ignoring JobGraph submission '{}' ({}) because the job already reached a globally-terminal state (i.e. {}) in a previous execution.",
-                            jobGraph.getName(),
-                            jobGraph.getJobID(),
-                            Arrays.stream(JobStatus.values())
-                                    .filter(JobStatus::isGloballyTerminalState)
-                                    .map(JobStatus::name)
-                                    .collect(Collectors.joining(", ")));
-                }
-
-                final DuplicateJobSubmissionException exception =
-                        isInGloballyTerminalState(jobGraph.getJobID())
-                                ? DuplicateJobSubmissionException.ofGloballyTerminated(
-                                        jobGraph.getJobID())
-                                : DuplicateJobSubmissionException.of(jobGraph.getJobID());
-                return FutureUtils.completedExceptionally(exception);
+            if (isInGloballyTerminalState(jobID)) {
+                log.warn(
+                        "Ignoring JobGraph submission '{}' ({}) because the job already reached a globally-terminal state (i.e. {}) in a previous execution.",
+                        jobGraph.getName(),
+                        jobID,
+                        Arrays.stream(JobStatus.values())
+                                .filter(JobStatus::isGloballyTerminalState)
+                                .map(JobStatus::name)
+                                .collect(Collectors.joining(", ")));
+                return FutureUtils.completedExceptionally(
+                        DuplicateJobSubmissionException.ofGloballyTerminated(jobID));
+            } else if (jobManagerRunnerRegistry.isRegistered(jobID)
+                    || submittedAndWaitingTerminationJobIDs.contains(jobID)) {
+                // job with the given jobID is not terminated, yet
+                return FutureUtils.completedExceptionally(
+                        DuplicateJobSubmissionException.of(jobID));
             } else if (isPartialResourceConfigured(jobGraph)) {
                 return FutureUtils.completedExceptionally(
                         new JobSubmissionException(
-                                jobGraph.getJobID(),
+                                jobID,
                                 "Currently jobs is not supported if parts of the vertices have "
                                         + "resources configured. The limitation will be removed in future versions."));
             } else {
@@ -560,19 +559,6 @@ public abstract class Dispatcher extends FencedRpcEndpoint<DispatcherId>
         ExecutionGraphInfo executionGraphInfo = new ExecutionGraphInfo(archivedExecutionGraph);
         writeToExecutionGraphInfoStore(executionGraphInfo);
         return archiveExecutionGraphToHistoryServer(executionGraphInfo);
-    }
-
-    /**
-     * Checks whether the given job has already been submitted, executed, or awaiting termination.
-     *
-     * @param jobId identifying the submitted job
-     * @return true if the job has already been submitted (is running) or has been executed
-     * @throws FlinkException if the job scheduling status cannot be retrieved
-     */
-    private boolean isDuplicateJob(JobID jobId) throws FlinkException {
-        return isInGloballyTerminalState(jobId)
-                || jobManagerRunnerRegistry.isRegistered(jobId)
-                || submittedAndWaitingTerminationJobIDs.contains(jobId);
     }
 
     /**
@@ -935,6 +921,13 @@ public abstract class Dispatcher extends FencedRpcEndpoint<DispatcherId>
         return maybeJob.map(job -> job.requestJob(timeout))
                 .orElse(FutureUtils.completedExceptionally(new FlinkJobNotFoundException(jobId)))
                 .exceptionally(checkExecutionGraphStoreOnException);
+    }
+
+    @Override
+    public CompletableFuture<CheckpointStatsSnapshot> requestCheckpointStats(
+            JobID jobId, Time timeout) {
+        return performOperationOnJobMasterGateway(
+                jobId, gateway -> gateway.requestCheckpointStats(timeout));
     }
 
     @Override
